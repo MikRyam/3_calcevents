@@ -2,9 +2,8 @@ const emitter = require('./emitter');
 
 emitter.on('divide', (a, b) => {
   if (b === 0) {
-    console.error('Ошибка: деление на ноль невозможно');
-    process.exitCode = 1;
+    emitter.emit('calc:error', 'Ошибка: деление на ноль невозможно');
     return;
   }
-  console.log(a / b);
+  emitter.emit('result', a / b);
 });

@@ -1,13 +1,38 @@
 const emitter = require('./emitter');
 
-// ⚡ КРИТИЧНО: импортируем модули операций,
-// чтобы они успели ПОДПИСАТЬСЯ на события ДО того, как мы emit'им.
+// Подписываемся на события ДО подгрузки операций,
+// чтобы гарантированно поймать их ответы.
+emitter.on('result', (result) => {
+  console.log(result);
+});
+
+emitter.on('calc:error', (message) => {
+  console.error(message);
+  process.exit(1);
+});
+
+// Загружаем модули операций — они вешают слушатели на 'add', 'subtract', …
 require('./add');
 require('./subtract');
 require('./multiply');
 require('./divide');
 
 const VALID_OPERATIONS = ['add', 'subtract', 'multiply', 'divide'];
+
+/**
+ * Приводит строку к числу или бросает исключение, если это не число.
+ * Закрывает дыру: Number('') === 0, Number('   ') === 0.
+ */
+function parseNumber(str, label) {
+  if (str.trim() === '') {
+    throw new Error(`Ошибка: ${label} ("${str}") не является числом`);
+  }
+  const n = Number(str);
+  if (Number.isNaN(n)) {
+    throw new Error(`Ошибка: ${label} ("${str}") не является числом`);
+  }
+  return n;
+}
 
 function main() {
   const args = process.argv.slice(2);
@@ -19,11 +44,13 @@ function main() {
   }
 
   const [aStr, bStr, op] = args;
-  const a = Number(aStr);
-  const b = Number(bStr);
 
-  if (Number.isNaN(a) || Number.isNaN(b)) {
-    console.error(`Ошибка: "${aStr}" или "${bStr}" не является числом`);
+  let a, b;
+  try {
+    a = parseNumber(aStr, 'первое число');
+    b = parseNumber(bStr, 'второе число');
+  } catch (err) {
+    console.error(err.message);
     process.exit(1);
   }
 
@@ -33,8 +60,8 @@ function main() {
     process.exit(1);
   }
 
-  // Никакой бизнес-логики — просто публикуем событие.
-  // Если подписчиков нет, emit вернёт false — можно это использовать как проверку.
+  // Публикуем событие. Ответ придёт асинхронно (в смысле — через другой emit)
+  // в обработчики 'result' / 'calc:error', которые повесили выше.
   const hasListeners = emitter.emit(op, a, b);
   if (!hasListeners) {
     console.error(`Ошибка: обработчик для "${op}" не найден`);
